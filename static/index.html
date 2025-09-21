@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Сокращатель ссылок</title>
+  <!--<link rel="icon" href="/static/icons/favicon.ico" type="image/svg+xml">-->
+  <!--<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🔗</text></svg>">-->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23667eea'/><text x='50' y='58' font-size='60' text-anchor='middle' dominant-baseline='middle' fill='white'>🔗</text></svg>">
+
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 3em;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+      font-weight: 300;
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    input {
+      width: 100%;
+      padding: 15px 20px;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: all 0.3s ease;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin: 10px 5px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .button-copy {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    }
+
+    #result {
+      margin: 30px 0;
+      padding: 25px;
+      border-radius: 15px;
+      min-height: 120px;
+      transition: all 0.3s ease;
+    }
+
+    .success {
+      background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+      color: #155724;
+      border: 2px solid #c3e6cb;
+    }
+
+    .error {
+      background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+      color: #721c24;
+      border: 2px solid #f5c6cb;
+    }
+
+    .cat-image {
+      max-width: 120px;
+      margin: 20px auto;
+      display: block;
+      border-radius: 15px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+      transition: transform 0.3s ease;
+    }
+
+    .cat-image:hover {
+      transform: scale(1.05);
+    }
+
+    .short-url {
+      font-size: 18px;
+      font-weight: bold;
+      color: #667eea;
+      text-decoration: none;
+      word-break: break-all;
+      display: block;
+      margin: 15px 0;
+      padding: 10px;
+      background: rgba(255,255,255,0.9);
+      border-radius: 8px;
+      border: 1px dashed #667eea;
+    }
+
+    .short-url:hover {
+      text-decoration: underline;
+      background: rgba(255,255,255,1);
+    }
+
+    .stats {
+      margin-top: 25px;
+      font-size: 14px;
+      color: #666;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border-left: 4px solid #667eea;
+    }
+
+    .copy-btn {
+      margin-top: 10px;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+
+    .instructions {
+      margin-top: 20px;
+      font-size: 13px;
+      color: #888;
+      text-align: left;
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 3px solid #ffc107;
+    }
+
+    .instructions ul {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+
+    .instructions li {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">🔗</div>
+    <h1>Сократитель Ссылок</h1>
+
+    <div class="input-group">
+      <input id="long" type="url" placeholder="https://example.com или example.com" />
+    </div>
+
+    <button onclick="shorten()">Сократить ссылку</button>
+
+    <div id="result"></div>
+
+    <div class="stats" id="stats">
+      Загрузка статистики...
+    </div>
+
+    <div class="instructions">
+      <strong>💡 Как использовать:</strong>
+      <ul>
+        <li>Вставьте ссылку в поле выше</li>
+        <li>Нажмите "Сократить ссылку" или Enter</li>
+        <li>Копируйте короткую ссылку из результата</li>
+        <li>Все ссылки сохраняются автоматически</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    async function shorten() {
+    const long = document.getElementById('long').value.trim();
+    const resultDiv = document.getElementById('result');
+
+    resultDiv.innerHTML = '';
+    resultDiv.className = '';
+
+    if (!long) {
+        showError('Введите ссылку для сокращения');
+        return;
+    }
+
+    try {
+        // Используем абсолютный путь
+        const res = await fetch('/shorten', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({long_url: long})
+        });
+
+        // Проверяем тип контента
+        const contentType = res.headers.get('content-type');
+        let data;
+
+        if (contentType && contentType.includes('application/json')) {
+            data = await res.json();
+        } else {
+            const text = await res.text();
+            throw new Error(`Server returned HTML instead of JSON: ${text.substring(0, 100)}...`);
+        }
+
+        if (!res.ok) {
+            showError('Ошибка: ' + (data.error || `HTTP ${res.status}`));
+            return;
+        }
+
+        showSuccess(data.short_url);
+        loadStats();
+
+    } catch (error) {
+        console.error('Fetch error:', error);
+        showError('Ошибка соединения: ' + error.message);
+    }
+}
+
+// Также обновите функцию loadStats
+async function loadStats() {
+    try {
+        const res = await fetch('/stats');
+        const contentType = res.headers.get('content-type');
+
+        if (contentType && contentType.includes('application/json')) {
+            const data = await res.json();
+            document.getElementById('stats').innerHTML =
+                `📊 Всего сокращено ссылок: <strong>${data.total_links}</strong>`;
+        } else {
+            document.getElementById('stats').innerHTML = 'Статистика в неожиданном формате';
+        }
+    } catch (error) {
+        console.error('Stats error:', error);
+        document.getElementById('stats').innerHTML = 'Статистика недоступна';
+    }
+}
+
+    function showSuccess(shortUrl) {
+      const resultDiv = document.getElementById('result');
+      resultDiv.className = 'success';
+      resultDiv.innerHTML = `
+        <strong>✅ Ссылка готова!</strong><br>
+        <a href="${shortUrl}" target="_blank" class="short-url">${shortUrl}</a>
+        <button onclick="copyToClipboard('${shortUrl}')" class="button-copy copy-btn">📋 Копировать</button>
+        <img src="/static/img/png-cat.png" alt="Успех!" class="cat-image">
+        <div>Ссылка скопирована в буфер обмена!</div>
+      `;
+      copyToClipboard(shortUrl);
+    }
+
+    function showError(message) {
+      const resultDiv = document.getElementById('result');
+      resultDiv.className = 'error';
+      resultDiv.innerHTML = `<strong>❌ ${message}</strong>`;
+    }
+
+    async function copyToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        console.log('Ссылка скопирована:', text);
+      } catch (err) {
+        console.error('Ошибка копирования:', err);
+        // Fallback для старых браузеров
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+    }
+
+
+
+    // Загружаем статистику при старте
+    loadStats();
+
+    // Обработчик Enter
+    document.getElementById('long').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        shorten();
+      }
+    });
+
+    // Фокус на input при загрузке
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('long').focus();
+    });
+  </script>
+</body>
+</html>
