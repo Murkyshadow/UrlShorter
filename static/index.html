@@ -210,8 +210,8 @@
     </div>
   </div>
 
-  <script>
-    async function shorten() {
+<script>
+async function shorten() {
     const long = document.getElementById('long').value.trim();
     const resultDiv = document.getElementById('result');
 
@@ -224,23 +224,17 @@
     }
 
     try {
-        // Используем абсолютный путь
+        // ФИКС: Используем относительный путь
         const res = await fetch('/shorten', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             body: JSON.stringify({long_url: long})
         });
 
-        // Проверяем тип контента
-        const contentType = res.headers.get('content-type');
-        let data;
-
-        if (contentType && contentType.includes('application/json')) {
-            data = await res.json();
-        } else {
-            const text = await res.text();
-            throw new Error(`Server returned HTML instead of JSON: ${text.substring(0, 100)}...`);
-        }
+        const data = await res.json();
 
         if (!res.ok) {
             showError('Ошибка: ' + (data.error || `HTTP ${res.status}`));
@@ -256,76 +250,65 @@
     }
 }
 
-// Также обновите функцию loadStats
 async function loadStats() {
     try {
         const res = await fetch('/stats');
-        const contentType = res.headers.get('content-type');
-
-        if (contentType && contentType.includes('application/json')) {
-            const data = await res.json();
-            document.getElementById('stats').innerHTML =
-                `📊 Всего сокращено ссылок: <strong>${data.total_links}</strong>`;
-        } else {
-            document.getElementById('stats').innerHTML = 'Статистика в неожиданном формате';
-        }
+        const data = await res.json();
+        document.getElementById('stats').innerHTML =
+            `📊 Всего сокращено ссылок: <strong>${data.total_links}</strong>`;
     } catch (error) {
         console.error('Stats error:', error);
         document.getElementById('stats').innerHTML = 'Статистика недоступна';
     }
 }
 
-    function showSuccess(shortUrl) {
-      const resultDiv = document.getElementById('result');
-      resultDiv.className = 'success';
-      resultDiv.innerHTML = `
+function showSuccess(shortUrl) {
+    const resultDiv = document.getElementById('result');
+    resultDiv.className = 'success';
+    resultDiv.innerHTML = `
         <strong>✅ Ссылка готова!</strong><br>
         <a href="${shortUrl}" target="_blank" class="short-url">${shortUrl}</a>
         <button onclick="copyToClipboard('${shortUrl}')" class="button-copy copy-btn">📋 Копировать</button>
-        <img src="/static/img/png-cat.png" alt="Успех!" class="cat-image">
-        <div>Ссылка скопирована в буфер обмена!</div>
-      `;
-      copyToClipboard(shortUrl);
-    }
+        <div>Ссылка будет открыта в новой вкладке</div>
+    `;
+}
 
-    function showError(message) {
-      const resultDiv = document.getElementById('result');
-      resultDiv.className = 'error';
-      resultDiv.innerHTML = `<strong>❌ ${message}</strong>`;
-    }
+function showError(message) {
+    const resultDiv = document.getElementById('result');
+    resultDiv.className = 'error';
+    resultDiv.innerHTML = `<strong>❌ ${message}</strong>`;
+}
 
-    async function copyToClipboard(text) {
-      try {
+async function copyToClipboard(text) {
+    try {
         await navigator.clipboard.writeText(text);
-        console.log('Ссылка скопирована:', text);
-      } catch (err) {
+        alert('Ссылка скопирована в буфер обмена!');
+    } catch (err) {
         console.error('Ошибка копирования:', err);
-        // Fallback для старых браузеров
         const textArea = document.createElement('textarea');
         textArea.value = text;
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-      }
+        alert('Ссылка скопирована!');
     }
+}
 
+// Загружаем статистику при старте
+loadStats();
 
-
-    // Загружаем статистику при старте
-    loadStats();
-
-    // Обработчик Enter
-    document.getElementById('long').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
+// Обработчик Enter
+document.getElementById('long').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
         shorten();
-      }
-    });
+    }
+});
 
-    // Фокус на input при загрузке
-    document.addEventListener('DOMContentLoaded', function() {
-      document.getElementById('long').focus();
-    });
-  </script>
+// Фокус на input при загрузке
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('long').focus();
+});
+</script>
 </body>
 </html>
