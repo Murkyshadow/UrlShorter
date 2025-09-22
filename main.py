@@ -5,16 +5,18 @@ import random
 import string
 import psycopg2
 from dotenv import load_dotenv
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 class DataBase():
     def __init__(self):
-        load_dotenv('.env')   # загружаем переменные из .env чтобы они остались в секрете
+        load_dotenv('.env')
         self.host = os.getenv('DB_HOST', 'localhost')
         self.name = os.getenv('DB_NAME', 'url_shortener')
         self.user = os.getenv('DB_USER', 'postgres')
-        self.password = os.getenv('DB_PASSWORD', '')
+        self.password = os.getenv('DB_PASSWORD', 'password')
         self.port = os.getenv('DB_PORT', 5432)
         self.result_con = self.connect()
         if self.result_con:
@@ -22,96 +24,88 @@ class DataBase():
 
     def connect(self):
         try:
-
             self.connection = psycopg2.connect(
                 host=self.host,
                 database=self.name,
                 user=self.user,
                 password=self.password,
                 port=self.port,
-                client_encoding='utf-8'  # ← Добавьте эту строку
+                client_encoding='utf-8'
             )
-            print('success connect to DB!')
+            print('✅ Успешное подключение к БД!')
             return True
         except Exception as er:
-            print(f'Fail: {er} Но на этот случай есть json file')
+            print(f'❌ Ошибка подключения к БД: {er}. Используем JSON файл')
             return False
 
     def create_table(self):
-        cur = self.connection.cursor()
-        cur.execute("""CREATE TABLE IF NOT EXISTS urls (
-            short_code VARCHAR(10) PRIMARY KEY,
-            original_url TEXT NOT NULL,
-            count_cliks INTEGER,
-            created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        self.connection.commit()
+        if self.result_con:
+            cur = self.connection.cursor()
+            cur.execute("""CREATE TABLE IF NOT EXISTS urls (
+                short_code VARCHAR(10) PRIMARY KEY,
+                original_url TEXT NOT NULL,
+                count_cliks INTEGER,
+                created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            self.connection.commit()
 
     def get_data(self):
         try:
-            cur = self.connection.cursor()
-            cur.execute("""SELECT short_code, original_url FROM urls""")
-            return dict(cur.fetchall())
+            if self.result_con:
+                cur = self.connection.cursor()
+                cur.execute("""SELECT short_code, original_url FROM urls""")
+                result = cur.fetchall()
+                return {row[0]: row[1] for row in result} if result else {}
         except Exception as er:
-            print(f"Не удалось добавить запись. {er}")
+            print(f"❌ Ошибка получения данных из БД: {er}")
+        return {}
 
     def add_data(self, short_code, original_url):
         try:
-            cur = self.connection.cursor()
-            cur.execute("""INSERT INTO urls (short_code, original_url, count_cliks) VALUES (%s, %s, %s)""", (short_code, original_url, 0))
-            self.connection.commit()
+            if self.result_con:
+                cur = self.connection.cursor()
+                cur.execute("SELECT 1 FROM urls WHERE short_code = %s", (short_code,))
+                exists = cur.fetchone()
+
+                if not exists:
+                    cur.execute("INSERT INTO urls (short_code, original_url, count_cliks) VALUES (%s, %s, %s)",
+                                (short_code, original_url, 0))
+                    self.connection.commit()
+                    print(f"✅ Добавлена запись в БД: {short_code}")
         except Exception as er:
-            print(f"Не удалось добавить запись. {er}")
-        
+            print(f"❌ Ошибка добавления в БД: {er}")
 
     def add_click(self, code):
-        """для подсчета кликов"""
-        cur = self.connection.cursor()
-        cur.execute(
-            "UPDATE urls SET count_cliks = count_cliks + %s WHERE short_code = %s", (1, code)
-        )
-        self.connection.commit()
-
-
+        if self.result_con:
+            try:
+                cur = self.connection.cursor()
+                cur.execute("UPDATE urls SET count_cliks = count_cliks + 1 WHERE short_code = %s", (code,))
+                self.connection.commit()
+            except Exception as er:
+                print(f"❌ Ошибка обновления кликов: {er}")
 
 def load_db(file='urls.json'):
-    """Загружаем данные из файла"""
     if os.path.exists(file):
         try:
             with open(file, 'r') as f:
                 return json.load(f)
-        except:
+        except Exception as e:
+            print(f"❌ Ошибка загрузки JSON: {e}")
             return {}
+    print("📁 JSON файл не найден, создаем новый")
     return {}
 
-def clear_json_file(filename='reserve_data.json'):
-    """Очищает JSON файл, записывая в него пустой словарь"""
-    try:
-        with open(filename, 'w') as f:
-            json.dump({}, f, indent=2)
-        print(f"Файл {filename} успешно очищен")
-        return True
-    except Exception as e:
-        print(f"Ошибка: {e}")
-        return False
-
 def save_db(data, file='urls.json'):
-    """Сохраняем данные в файл"""
-    with open(file, 'w') as f:
-        json.dump(data, f, indent=2)
+    try:
+        with open(file, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"❌ Ошибка сохранения JSON: {e}")
 
-
-# print(f"DB_data тип: {type(DB_data)}, значение: {DB_data}")
-# print(f"DB_obj.result_con: {DB_obj.result_con}")
-
-# Список запрещенных кодов
 RESERVED_WORDS = {
-    'health', 'stats', 'info', 'shorten',
-    'static', 'api', 'admin', 'login', 'register',
-    'user', 'users', 'dashboard', 'profile'
+    'health', 'stats', 'info', 'shorten', 'static', 'api', 'admin'
 }
-data_for_update = {}    # данные, которые надо добавить в БД, если сейчас БД недоступна
 
 @app.route('/')
 def index():
@@ -142,7 +136,9 @@ def shorten_url():
         if not data or 'long_url' not in data:
             return jsonify({"error": "Missing 'long_url' in request"}), 400
 
-        long_url = data['long_url']
+        long_url = data['long_url'].strip()
+        if not long_url:
+            return jsonify({"error": "URL cannot be empty"}), 400
 
         if not long_url.startswith(('http://', 'https://')):
             long_url = 'https://' + long_url
@@ -153,16 +149,24 @@ def shorten_url():
             if code not in DB_data and code not in RESERVED_WORDS:
                 break
 
-        # Сохраняем в базу и файл
+        # Сохраняем данные
         DB_data[code] = long_url
         save_db(DB_data)
+
         if DB_obj.result_con:
             DB_obj.add_data(code, long_url)
-        else:
-            data_for_update[code] = long_url
-            save_db(data_for_update, 'reserve_data.json')
 
-        short_url = f"https://darkshaddow.pythonanywhere.com/{code}"
+        # ФИКС для Docker: определяем правильный URL
+        if 'DOCKER' in os.environ:
+            base_url = f"http://{request.host}"
+        else:
+            base_url = f"http://{request.host}"
+
+        short_url = f"{base_url}/{code}"
+
+        print(f"🔗 Создана ссылка: {code} -> {long_url}")
+        print(f"📝 Короткая ссылка: {short_url}")
+
         return jsonify({
             "short_url": short_url,
             "code": code,
@@ -170,53 +174,48 @@ def shorten_url():
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        print(f"❌ Ошибка в shorten_url: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/<code>')
 def redirect_code(code):
-    if code not in DB_data:
-        return jsonify({"error": "Ссылка не найдена"}), 404
-    elif DB_obj.result_con:
-        DB_obj.add_click(code)
+    print(f"🔍 Запрос на перенаправление для кода: {code}")
+    print(f"📋 Доступные коды: {list(DB_data.keys())}")
 
-    from flask import redirect
-    return redirect(DB_data[code], code=302)
+    if code in DB_data:
+        print(f"↪️ Перенаправление: {code} -> {DB_data[code]}")
+        DB_obj.add_click(code)
+        from flask import redirect
+        return redirect(DB_data[code], code=302)
+    else:
+        print(f"❌ Код не найден: {code}")
+        return jsonify({"error": "Ссылка не найдена"}), 404
 
 @app.route('/stats')
 def stats():
-    """Статистика"""
     return jsonify({
         "total_links": len(DB_data),
         "latest_links": dict(list(DB_data.items())[-5:]) if DB_data else {}
     })
 
-@app.route('/info')
-def info():
-    return jsonify({
-        "version": "1.0",
-        "author": "DarkShaddow",
-        "description": "URL Shortener Service",
-        "endpoints": {
-            "shorten": "POST /shorten",
-            "redirect": "GET /{code}",
-            "stats": "GET /stats",
-            "health": "GET /health"
-        }
-    })
-
+# Инициализация приложения
 DB_obj = DataBase()
-# Файл для хранения данных
-DB_FILE = 'urls.json'
-DB_obj.add_data('123qwe', '123qwe')
-# Загружаем данные при старте
-if not DB_obj.result_con:   # если нет соединения с бд то пользуемся json файлом
-    DB_data = load_db()
+DB_data = load_db()
+
+# Синхронизация данных между БД и JSON
+if DB_obj.result_con:
+    db_data = DB_obj.get_data()
+    if db_data:
+        # Обновляем JSON данными из БД
+        DB_data.update(db_data)
+        save_db(DB_data)
+        print("✅ Данные синхронизированы из БД в JSON")
 else:
-    for code, long_url in load_db("reserve_data.json").items():
-        DB_obj.add_data(code, long_url)
-    clear_json_file()
-    DB_data = DB_obj.get_data()
+    print("📁 Используем хранение данных в JSON файле")
 
+print(f"📊 Загружено ссылок: {len(DB_data)}")
+print(f"📋 Коды: {list(DB_data.keys())}")
 
-# if __name__ == '__main__':
-#     app.run(debug=True)
+if __name__ == '__main__':
+    # ФИКС для Docker: используем 0.0.0.0 чтобы принимать соединения извне
+    app.run(host='0.0.0.0', port=5000, debug=False)
